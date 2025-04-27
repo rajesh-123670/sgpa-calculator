@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGPA Calculator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: #f0f8ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+            max-width: 700px;
+            width: 95%;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .pdf-details-input {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background-color: #f9f9f9;
+        }
+        .pdf-details-input label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: bold;
+        }
+        .pdf-details-input input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        #subject-inputs {
+            margin-bottom: 20px;
+        }
+        .subject-input {
+            margin-bottom: 15px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background-color: #f9f9f9;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr; /* Subject | Grade | Remove */
+            gap: 15px;
+            align-items: center;
+        }
+        .subject-input label {
+            color: #333;
+            font-weight: bold;
+        }
+        .subject-input select {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .buttons-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            justify-content: center;
+        }
+        button {
+            padding: 12px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #result {
+            margin-top: 30px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            color: #28a745;
+        }
+        .add-subject {
+            background-color: #28a745;
+        }
+        .add-subject:hover {
+            background-color: #1e7e34;
+        }
+        .remove-subject {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 8px 12px;
+            transition: background-color 0.3s ease;
+        }
+        .remove-subject:hover {
+            background-color: #c82333;
+        }
+        #share-note {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #777;
+            text-align: center;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>SGPA Calculator</h1>
+
+        <div class="pdf-details-input">
+            <label for="student-name">Student Name:</label>
+            <input type="text" id="student-name" placeholder="Enter your name">
+            <label for="roll-number">Roll Number:</label>
+            <input type="text" id="roll-number" placeholder="Enter your roll number">
+            <label for="semester">Semester:</label>
+            <input type="text" id="semester" placeholder="Enter semester (e.g., Fall 2023)">
+        </div>
+
+        <div id="subject-inputs">
+            </div>
+        <div class="buttons-container">
+            <button id="add-subject-btn" class="add-subject">Add Subject</button>
+            <button id="calculate-btn">Calculate SGPA</button>
+            <button id="generate-pdf-btn">Download PDF</button>
+        </div>
+        <div id="result"></div>
+        <p id="share-note">After downloading, you can share the PDF via WhatsApp or other platforms.</p>
+    </div>
+
+    <script>
+        const subjectInputsDiv = document.getElementById('subject-inputs');
+        const addSubjectBtn = document.getElementById('add-subject-btn');
+        const calculateBtn = document.getElementById('calculate-btn');
+        const generatePdfBtn = document.getElementById('generate-pdf-btn');
+        const resultDiv = document.getElementById('result');
+        const totalCredits = 25;
+
+        const credits = {
+            "COMS": 4,
+            "EMW": 4,
+            "LIC": 4,
+            "DSD": 3,
+            "FAI": 1,
+            "LICL": 2,
+            "DSDL": 2,
+            "COML": 2,
+            "RL": 3,
+        };
+
+        const grades = {
+            "EX": 10,
+            "A": 9,
+            "B": 8,
+            "C": 7,
+            "D": 6,
+            "E": 5,
+            "R": 0,
+        };
+
+        let subjectCount = 0;
+        let calculatedSgpa = "";
+        let subjectDetailsArray = [];
+
+        function addSubjectInput() {
+            subjectCount++;
+            const subjectDiv = document.createElement('div');
+            subjectDiv.classList.add('subject-input');
+            subjectDiv.innerHTML = `
+                <label for="subject-${subjectCount}">Subject ${subjectCount}:</label>
+                <select id="subject-${subjectCount}">
+                    <option value="">Select Subject</option>
+                    ${Object.keys(credits).map(subject => `<option value="${subject}">${subject}</option>`).join('')}
+                </select>
+                <label for="grade-${subjectCount}">Grade:</label>
+                <select id="grade-${subjectCount}">
+                    <option value="">Select Grade</option>
+                    ${Object.keys(grades).map(grade => `<option value="${grade}">${grade}</option>`).join('')}
+                </select>
+                <button class="remove-subject" data-subject-id="${subjectCount}">Remove</button>
+            `;
+            subjectInputsDiv.appendChild(subjectDiv);
+
+            const removeButton = subjectDiv.querySelector('.remove-subject');
+            removeButton.addEventListener('click', function() {
+                const subjectIdToRemove = this.dataset.subjectId;
+                const subjectToRemove = document.querySelector(`#subject-${subjectIdToRemove}`).parentNode;
+                subjectInputsDiv.removeChild(subjectToRemove);
+            });
+        }
+
+        addSubjectBtn.addEventListener('click', addSubjectInput);
+
+        calculateBtn.addEventListener('click', function() {
+            let totalGradePoints = 0;
+            let enteredCredits = 0;
+            let valid = true;
+            subjectDetailsArray = [];
+
+            for (let i = 1; i <= subjectCount; i++) {
+                const subjectSelect = document.getElementById(`subject-${i}`);
+                const gradeSelect = document.getElementById(`grade-${i}`);
+
+                if (subjectSelect && gradeSelect) {
+                    const subjectCode = subjectSelect.value.toUpperCase();
+                    const selectedGrade = gradeSelect.value.toUpperCase();
+
+                    if (subjectCode && selectedGrade) {
+                        if (credits.hasOwnProperty(subjectCode)) {
+                            if (grades.hasOwnProperty(selectedGrade)) {
+                                const credit = credits[subjectCode];
+                                const gradePoint = grades[selectedGrade];
+                                totalGradePoints += gradePoint * credit;
+                                enteredCredits += credit;
+                                subjectDetailsArray.push({ subject: subjectCode, grade: selectedGrade, credit: credit, gradePoint: gradePoint });
+                            } else {
+                                resultDiv.textContent = `Invalid grade selected for subject ${i}.`;
+                                valid = false;
+                                calculatedSgpa = "";
+                                break;
+                            }
+                        } else {
+                            resultDiv.textContent = `Invalid subject selected for subject ${i}.`;
+                            valid = false;
+                            calculatedSgpa = "";
+                            break;
+                        }
+                    } else if (subjectCode || selectedGrade) {
+                        resultDiv.textContent = `Please select both subject and grade for subject ${i}.`;
+                        valid = false;
+                        calculatedSgpa = "";
+                        break;
+                    }
+                }
+            }
+
+            if (valid) {
+                if (enteredCredits > 0) {
+                    const sgpa = (totalGradePoints / totalCredits).toFixed(2);
+                    resultDiv.textContent = `Your SGPA is: ${sgpa}`;
+                    calculatedSgpa = sgpa;
+                } else {
+                    resultDiv.textContent = "Please add at least one subject to calculate SGPA.";
+                    calculatedSgpa = "";
+                }
+            }
+        });
+
+        generatePdfBtn.addEventListener('click', function() {
+            if (calculatedSgpa) {
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF();
+                let y = 20;
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const margin = 10;
+
+                const universityName = "Rajiv Gandhi University of Knowledge Technologies";
+                const semester = document.getElementById('semester').value;
+
+                // Add University Name at the top
+                pdf.setFontSize(16);
+                pdf.text(universityName, pageWidth / 2, y, { align: 'center' });
+                y += 8;
+
+                // Add Semester below the university name
+                if (semester) {
+                    pdf.setFontSize(14);
+                    pdf.text(semester, pageWidth / 2, y, { align: 'center' });
+                    y += 12;
+                } else {
+                    y += 12;
+                }
+
+                // Add Student Details
+                pdf.setFontSize(12);
+                const studentName = document.getElementById('student-name').value;
+                const rollNumber = document.getElementById('roll-number').value;
+
+                if (studentName) {
+                    pdf.text(`Student Name: ${studentName}`, margin, y);
+                    y += 5;
+                }
+                if (rollNumber) {
+                    pdf.text(`Roll Number: ${rollNumber}`, margin, y);
+                    y += 10;
+                }
+
+                // Add Subject Details Table
+                pdf.setFontSize(14);
+                pdf.text("Subject Details:", margin, y);
+                y += 8;
+
+                const headers = ["Subject", "Grade", "Credit", "Points"];
+                const data = subjectDetailsArray.map(detail => [detail.subject, detail.grade, detail.credit, detail.gradePoint * detail.credit]);
+
+                const colWidths = [40, 25, 25, 25];
+                let x = margin;
+
+                // Draw Headers
+                pdf.setFontSize(12);
+                pdf.setFont('helvetica', 'bold');
+                headers.forEach((header, index) => {
+                    pdf.text(header, x, y);
+                    x += colWidths[index];
+                });
+                y += 5;
+                pdf.line(margin, y, margin + colWidths.reduce((a, b) => a + b, 0), y); // Horizontal line
+                y += 5;
+                pdf.setFont('helvetica', 'normal');
+                x = margin;
+
+                // Draw Data
+                data.forEach(row => {
+                    x = margin;
+                    row.forEach((cell, index) => {
+                        pdf.text(String(cell), x, y);
+                        x += colWidths[index];
+                    });
+                    y += 5;
+                });
+                pdf.line(margin, y, margin + colWidths.reduce((a, b) => a + b, 0), y); // Horizontal line
+                y += 10;
+
+                // Add Calculated SGPA
+                pdf.setFontSize(16);
+                pdf.text(`Calculated SGPA: ${calculatedSgpa}`, margin, y);
+
+                // Note about sharing (as a visual cue)
+                pdf.setFontSize(10);
+                pdf.setTextColor(100); // Light gray color
+                pdf.text("You can share this PDF after downloading.", margin, pdf.internal.pageSize.getHeight() - 10);
+
+                pdf.save(`sgpa_result_${new Date().getTime()}.pdf`);
+            } else {
+                alert("Please calculate the SGPA first.");
+            }
+        });
+
+        // Add initial subject input
+        addSubjectInput();
+    </script>
+</body>
+</html>
